@@ -38,6 +38,11 @@ export default function Login() {
         <button type="submit" className="bg-blue-500 text-white p-2 rounded">
           Login
         </button>
+
+        {/* Forgot Password link */}
+        <div className="text-sm text-blue-600 text-center hover:underline cursor-pointer mt-1">
+          Forgot Password?
+        </div>
       </form>
     </div>
   );
