@@ -80,6 +80,8 @@ def create_document():
 # ----------------------------------
 # Get Documents
 # ----------------------------------
+from pytz import timezone
+
 @app.route("/documents", methods=["GET"])
 @jwt_required()
 def get_documents():
@@ -87,42 +89,50 @@ def get_documents():
     user = User.query.filter_by(email=user_email).first()
     docs = Document.query.filter_by(author_id=user.id).all()
 
+    # Define IST timezone
+    ist = timezone('Asia/Kolkata')
+
     return jsonify([
         {
             "id": doc.id,
             "title": doc.title,
             "content": doc.content,
             "is_public": doc.is_public,
-            "updated_at": doc.updated_at,
+            "created_at": doc.created_at.astimezone(ist).strftime("%Y-%m-%d %I:%M:%S %p") if doc.created_at else None,
+            "updated_at": doc.updated_at.astimezone(ist).strftime("%Y-%m-%d %I:%M:%S %p") if doc.updated_at else None,
             "author": user.email
         }
         for doc in docs
     ]), 200
 
+
+
 # ----------------------------------
 # Search
 # ----------------------------------
-@app.route("/search", methods=["GET"])
+@app.route("/search")
 @jwt_required()
 def search_documents():
-    query = request.args.get("q", "").lower()
-    user_email = get_jwt_identity()
-    user = User.query.filter_by(email=user_email).first()
+    user = get_jwt_identity()
+    query = request.args.get("q", "")
+    docs = Document.query.filter(
+        Document.author_id == user["id"],
+        Document.title.ilike(f"%{query}%")
+    ).all()
 
-    docs = Document.query.filter_by(author_id=user.id).all()
-    matches = [
+    return jsonify([
         {
-            "id": doc.id,
-            "title": doc.title,
-            "content": doc.content,
-            "is_public": doc.is_public,
-            "updated_at": doc.updated_at,
-            "author": user.email
+            "id": d.id,
+            "title": d.title,
+            "content": d.content,
+            "author": d.author.email,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+            "is_public": d.is_public
         }
-        for doc in docs
-        if query in doc.title.lower() or query in doc.content.lower()
-    ]
-    return jsonify(matches), 200
+        for d in docs
+    ])
+
 
 # ----------------------------------
 # Delete Document
@@ -144,6 +154,24 @@ def delete_document(doc_id):
 @app.route("/", methods=["GET"])
 def home():
     return "Flask backend is running", 200
+
+@app.route("/document/<int:doc_id>", methods=["PUT"])
+@jwt_required()
+def update_document(doc_id):
+    user_email = get_jwt_identity()
+    user = User.query.filter_by(email=user_email).first()
+
+    doc = Document.query.filter_by(id=doc_id, author_id=user.id).first()
+    if not doc:
+        return jsonify({"msg": "Document not found"}), 404
+
+    data = request.json
+    doc.title = data.get("title", doc.title)
+    doc.content = data.get("content", doc.content)
+    db.session.commit()
+
+    return jsonify({"msg": "Document updated"}), 200
+
 
 if __name__ == "__main__":
     app.run(debug=True)
