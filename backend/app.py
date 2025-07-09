@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Document
+from pytz import timezone
 from datetime import datetime
 
 app = Flask(__name__)
@@ -22,6 +23,7 @@ jwt = JWTManager(app)
 # ----------------------------------
 with app.app_context():
     db.create_all()
+
 # ----------------------------------
 # Register
 # ----------------------------------
@@ -68,11 +70,12 @@ def create_document():
     data = request.json
     title = data.get("title")
     content = data.get("content")
+    is_public = data.get("is_public", False)
 
     if not title or not content:
         return jsonify({"msg": "Title and content are required"}), 400
 
-    doc = Document(title=title, content=content, author_id=user.id)
+    doc = Document(title=title, content=content, is_public=is_public, author_id=user.id)
     db.session.add(doc)
     db.session.commit()
     return jsonify({"msg": "Document created"}), 201
@@ -80,8 +83,6 @@ def create_document():
 # ----------------------------------
 # Get Documents
 # ----------------------------------
-from pytz import timezone
-
 @app.route("/documents", methods=["GET"])
 @jwt_required()
 def get_documents():
@@ -89,7 +90,6 @@ def get_documents():
     user = User.query.filter_by(email=user_email).first()
     docs = Document.query.filter_by(author_id=user.id).all()
 
-    # Define IST timezone
     ist = timezone('Asia/Kolkata')
 
     return jsonify([
@@ -105,34 +105,56 @@ def get_documents():
         for doc in docs
     ]), 200
 
-
-
 # ----------------------------------
-# Search
+# Search Documents
 # ----------------------------------
-@app.route("/search")
+@app.route("/search", methods=["GET"])
 @jwt_required()
 def search_documents():
-    user = get_jwt_identity()
+    user_email = get_jwt_identity()
+    user = User.query.filter_by(email=user_email).first()
     query = request.args.get("q", "")
+
     docs = Document.query.filter(
-        Document.author_id == user["id"],
+        Document.author_id == user.id,
         Document.title.ilike(f"%{query}%")
     ).all()
+
+    ist = timezone('Asia/Kolkata')
 
     return jsonify([
         {
             "id": d.id,
             "title": d.title,
             "content": d.content,
-            "author": d.author.email,
-            "created_at": d.created_at.isoformat() if d.created_at else None,
-            "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+            "author": user.email,
+            "created_at": d.created_at.astimezone(ist).strftime("%Y-%m-%d %I:%M:%S %p") if d.created_at else None,
+            "updated_at": d.updated_at.astimezone(ist).strftime("%Y-%m-%d %I:%M:%S %p") if d.updated_at else None,
             "is_public": d.is_public
         }
         for d in docs
-    ])
+    ]), 200
 
+# ----------------------------------
+# Update Document
+# ----------------------------------
+@app.route("/document/<int:doc_id>", methods=["PUT"])
+@jwt_required()
+def update_document(doc_id):
+    user_email = get_jwt_identity()
+    user = User.query.filter_by(email=user_email).first()
+
+    doc = Document.query.filter_by(id=doc_id, author_id=user.id).first()
+    if not doc:
+        return jsonify({"msg": "Document not found"}), 404
+
+    data = request.json
+    doc.title = data.get("title", doc.title)
+    doc.content = data.get("content", doc.content)
+    doc.is_public = data.get("is_public", doc.is_public)
+    db.session.commit()
+
+    return jsonify({"msg": "Document updated"}), 200
 
 # ----------------------------------
 # Delete Document
@@ -151,27 +173,12 @@ def delete_document(doc_id):
     db.session.commit()
     return jsonify({"msg": "Document deleted"}), 200
 
+# ----------------------------------
+# Root Health Check
+# ----------------------------------
 @app.route("/", methods=["GET"])
 def home():
     return "Flask backend is running", 200
-
-@app.route("/document/<int:doc_id>", methods=["PUT"])
-@jwt_required()
-def update_document(doc_id):
-    user_email = get_jwt_identity()
-    user = User.query.filter_by(email=user_email).first()
-
-    doc = Document.query.filter_by(id=doc_id, author_id=user.id).first()
-    if not doc:
-        return jsonify({"msg": "Document not found"}), 404
-
-    data = request.json
-    doc.title = data.get("title", doc.title)
-    doc.content = data.get("content", doc.content)
-    db.session.commit()
-
-    return jsonify({"msg": "Document updated"}), 200
-
 
 if __name__ == "__main__":
     app.run(debug=True)
