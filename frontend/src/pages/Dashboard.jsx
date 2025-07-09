@@ -8,6 +8,7 @@ export default function Dashboard() {
   const [content, setContent] = useState('');
   const [search, setSearch] = useState('');
   const [editId, setEditId] = useState(null);
+  const [isPublic, setIsPublic] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
   const token = localStorage.getItem('token');
@@ -32,14 +33,20 @@ export default function Dashboard() {
     }
 
     try {
+      const payload = {
+        title,
+        content,
+        is_public: isPublic
+      };
+
       if (editId) {
-        await API.put(`/document/${editId}`, { title, content }, {
+        await API.put(`/document/${editId}`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
         alert('Document updated');
         setEditId(null);
       } else {
-        await API.post('/document', { title, content }, {
+        await API.post('/document', payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
         alert('Document created');
@@ -47,6 +54,7 @@ export default function Dashboard() {
 
       setTitle('');
       setContent('');
+      setIsPublic(false);
       fetchDocs();
     } catch (err) {
       alert('Failed to create/update document.');
@@ -58,6 +66,7 @@ export default function Dashboard() {
     setEditId(doc.id);
     setTitle(doc.title);
     setContent(doc.content);
+    setIsPublic(doc.is_public);
   };
 
   const handleDelete = async (id) => {
@@ -128,6 +137,16 @@ export default function Dashboard() {
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="isPublic"
+            checked={isPublic}
+            onChange={(e) => setIsPublic(e.target.checked)}
+            className="accent-blue-500"
+          />
+          <label htmlFor="isPublic" className="text-sm">Make this document public</label>
+        </div>
         <button
           type="submit"
           className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
