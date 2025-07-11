@@ -6,9 +6,9 @@ export default function Dashboard() {
   const [docs, setDocs] = useState([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
   const [search, setSearch] = useState('');
   const [editId, setEditId] = useState(null);
-  const [isPublic, setIsPublic] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
   const token = localStorage.getItem('token');
@@ -33,20 +33,14 @@ export default function Dashboard() {
     }
 
     try {
-      const payload = {
-        title,
-        content,
-        is_public: isPublic
-      };
-
       if (editId) {
-        await API.put(`/document/${editId}`, payload, {
+        await API.put(`/document/${editId}`, { title, content, is_public: isPublic }, {
           headers: { Authorization: `Bearer ${token}` }
         });
         alert('Document updated');
         setEditId(null);
       } else {
-        await API.post('/document', payload, {
+        await API.post('/document', { title, content, is_public: isPublic }, {
           headers: { Authorization: `Bearer ${token}` }
         });
         alert('Document created');
@@ -106,6 +100,7 @@ export default function Dashboard() {
 
   return (
     <div className={`${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-black'} min-h-screen p-6`}>
+      {/* Top bar */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <div className="flex gap-3">
@@ -124,6 +119,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Create / Edit Form */}
       <form onSubmit={handleCreateOrUpdate} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md max-w-2xl mx-auto space-y-4">
         <input
           className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900"
@@ -137,15 +133,14 @@ export default function Dashboard() {
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 text-sm">
           <input
+            id="publicCheck"
             type="checkbox"
-            id="isPublic"
             checked={isPublic}
-            onChange={(e) => setIsPublic(e.target.checked)}
-            className="accent-blue-500"
+            onChange={() => setIsPublic(!isPublic)}
           />
-          <label htmlFor="isPublic" className="text-sm">Make this document public</label>
+          <label htmlFor="publicCheck">Make this document public</label>
         </div>
         <button
           type="submit"
@@ -155,6 +150,7 @@ export default function Dashboard() {
         </button>
       </form>
 
+      {/* Search Bar */}
       <div className="max-w-2xl mx-auto mt-6 flex gap-2">
         <input
           className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900"
@@ -170,21 +166,25 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* Document List */}
       <div className="max-w-2xl mx-auto mt-8 space-y-4">
+        <h2 className="text-xl font-semibold mb-2">Your Documents</h2>
         {docs.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400 italic">No documents found.</p>
         ) : (
           docs.map((doc) => (
             <div key={doc.id} className="bg-white dark:bg-gray-800 border p-4 rounded shadow space-y-2">
-              <h3 className="text-xl font-semibold text-indigo-700 dark:text-indigo-300">{doc.title}</h3>
-              <p>{doc.content}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 italic">By: {doc.author}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">Created: {new Date(doc.created_at).toLocaleString()}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">Updated: {new Date(doc.updated_at).toLocaleString()}</p>
-              <p className="text-xs font-medium text-blue-600 dark:text-blue-300">
-                Visibility: {doc.is_public ? 'Public' : 'Private'}
-              </p>
-              <div className="flex gap-2 mt-2">
+              <h3 className="text-lg font-semibold text-indigo-700 dark:text-indigo-300">{doc.title}</h3>
+              <p className="text-sm">{doc.content}</p>
+              <p className="text-xs italic text-gray-500 dark:text-gray-400">By: {doc.author}</p>
+              <div className="text-xs text-gray-400 dark:text-gray-500 space-y-1">
+                <p>Created: {doc.created_at}</p>
+                <p>Updated: {doc.updated_at}</p>
+                <p className="font-medium text-blue-600 dark:text-blue-300">
+                  Visibility: {doc.is_public ? 'Public' : 'Private'}
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
                 <button
                   onClick={() => handleEdit(doc)}
                   className="bg-yellow-400 hover:bg-yellow-500 text-white px-3 py-1 rounded"
